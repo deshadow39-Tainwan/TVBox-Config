@@ -31,8 +31,7 @@ jobs:
       - name: Build global M3U
         run: python build_global.py
 
-      - name: Commit and push playlist
-        shell: bash
+      - name: Commit playlist
         run: |
           set -e
 
@@ -42,21 +41,12 @@ jobs:
           git add TVBox_Global_Live.m3u
 
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo "No changes."
             exit 0
           fi
 
           git commit -m "Update global live playlist"
 
-          for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              echo "Playlist updated successfully."
-              exit 0
-            fi
-
-            echo "Push failed. Retry $attempt/3"
-            sleep 5
-          done
-
-          echo "Failed to push after 3 attempts."
-          exit 1
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
