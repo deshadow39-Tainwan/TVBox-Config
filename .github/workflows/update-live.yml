@@ -8,22 +8,55 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: global-live-update
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Build and validate global M3U
+      - name: Build global M3U
         run: python build_global.py
 
-      - name: Commit playlist
+      - name: Commit and push playlist
+        shell: bash
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add TVBox_Global_Live.m3u
-          git diff --cached --quiet || (git commit -m "Update global live playlist" && git push)
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update global live playlist"
+
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Playlist updated successfully."
+              exit 0
+            fi
+
+            echo "Push failed. Retry $attempt/3"
+            sleep 5
+          done
+
+          echo "Failed to push after 3 attempts."
+          exit 1
